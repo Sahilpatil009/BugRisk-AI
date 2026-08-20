@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 import httpx
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -29,6 +31,26 @@ def test_oauth_refuses_missing_configuration():
         assert exc.status_code == 503
     else:
         raise AssertionError("OAuth should require provider credentials")
+
+
+def test_oauth_redirect_uses_callback_scope_and_session_state():
+    class RequestStub:
+        session: dict[str, str] = {}
+
+    request = RequestStub()
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_client_id="configured-client",
+        github_client_secret="configured-secret",
+        backend_url="http://localhost:8000",
+    )
+
+    redirect = begin_oauth(request, settings)  # type: ignore[arg-type]
+    query = parse_qs(urlparse(redirect).query)
+
+    assert query["redirect_uri"] == ["http://localhost:8000/auth/github/callback"]
+    assert query["scope"] == ["read:user user:email repo"]
+    assert query["state"] == [request.session["oauth_state"]]
 
 
 def test_llm_rewrite_has_deterministic_fallback(monkeypatch):

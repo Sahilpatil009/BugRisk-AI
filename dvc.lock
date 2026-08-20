@@ -43,14 +43,14 @@ stages:
       size: 962
     - path: ml/training/train.py
       hash: md5
-      md5: 0d5210b725739e5c354eb0b134cf5e13
-      size: 6221
+      md5: 34e2a64785305b7e0e705efa450e7cb0
+      size: 7437
     outs:
     - path: ml/artifacts/bugrisk_model.joblib
       hash: md5
-      md5: c412cb1b0df1624488f18331691f47a7
-      size: 751376
+      md5: af99efdd126baf4ae2e7640f04ca5ec7
+      size: 751503
     - path: ml/artifacts/metrics.json
       hash: md5
-      md5: 843d5b3ae195b3808620b66b1b6fcb1d
-      size: 2020
+      md5: b9d55b55fa143bebd1a93619008201f0
+      size: 2382

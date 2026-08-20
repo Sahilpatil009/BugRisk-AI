@@ -30,5 +30,7 @@ def test_training_exports_loadable_calibrated_artifact(tmp_path: Path):
     prediction = service.predict({feature: 5.0 for feature in FEATURE_NAMES})
 
     assert bundle["model_name"] in {"logistic_regression", "random_forest", "xgboost"}
+    assert 0.05 <= bundle["decision_threshold"] <= 0.5
+    assert bundle["test_metrics"]["decision_threshold"] == bundle["decision_threshold"]
     assert 0 <= prediction.probability <= 1
     assert (output / "metrics.json").exists()

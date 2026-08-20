@@ -2,6 +2,7 @@ import base64
 import hashlib
 import secrets
 from typing import Annotated
+from urllib.parse import urlencode
 
 import httpx
 from cryptography.fernet import Fernet
@@ -68,11 +69,15 @@ def begin_oauth(request: Request, settings: Settings) -> str:
         raise HTTPException(status_code=503, detail="GitHub OAuth is not configured")
     state = secrets.token_urlsafe(32)
     request.session["oauth_state"] = state
-    return (
-        "https://github.com/login/oauth/authorize"
-        f"?client_id={settings.github_client_id}&redirect_uri={settings.backend_url}/auth/github/callback"
-        f"&scope=read:user%20user:email%20repo&state={state}"
+    query = urlencode(
+        {
+            "client_id": settings.github_client_id,
+            "redirect_uri": f"{settings.backend_url}/auth/github/callback",
+            "scope": "read:user user:email repo",
+            "state": state,
+        }
     )
+    return f"https://github.com/login/oauth/authorize?{query}"
 
 
 async def finish_oauth(
