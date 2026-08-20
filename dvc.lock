@@ -1,0 +1,56 @@
+schema: '2.0'
+stages:
+  acquire:
+    cmd: python scripts/fetch_apachejit.py --output ml/data/raw/apachejit.csv
+    deps:
+    - path: scripts/fetch_apachejit.py
+      hash: md5
+      md5: efc68427b3371b5e957af29ca0e9e23c
+      size: 1194
+    outs:
+    - path: ml/data/raw/apachejit.csv
+      hash: md5
+      md5: 98e102741020b3b13798d1e10a350689
+      size: 16467692
+  preprocess:
+    cmd: python -m ml.preprocessing.prepare --input ml/data/raw/apachejit.csv
+      --output ml/data/processed/apachejit.csv
+    deps:
+    - path: ml/data/raw/apachejit.csv
+      hash: md5
+      md5: 98e102741020b3b13798d1e10a350689
+      size: 16467692
+    - path: ml/preprocessing/prepare.py
+      hash: md5
+      md5: 81b022e67db4ea2ec5b8ef96a0e4da30
+      size: 2344
+    outs:
+    - path: ml/data/processed/apachejit.csv
+      hash: md5
+      md5: 6fac8d6a47a29dcca5297a7fb6afea8a
+      size: 12146102
+  train:
+    cmd: python -m ml.training.train --data ml/data/processed/apachejit.csv
+      --output ml/artifacts
+    deps:
+    - path: ml/data/processed/apachejit.csv
+      hash: md5
+      md5: 6fac8d6a47a29dcca5297a7fb6afea8a
+      size: 12146102
+    - path: ml/features/schema.py
+      hash: md5
+      md5: 2adc9e67ef5c3dd2cc379c03547ebeb0
+      size: 962
+    - path: ml/training/train.py
+      hash: md5
+      md5: 0d5210b725739e5c354eb0b134cf5e13
+      size: 6221
+    outs:
+    - path: ml/artifacts/bugrisk_model.joblib
+      hash: md5
+      md5: c412cb1b0df1624488f18331691f47a7
+      size: 751376
+    - path: ml/artifacts/metrics.json
+      hash: md5
+      md5: 843d5b3ae195b3808620b66b1b6fcb1d
+      size: 2020
