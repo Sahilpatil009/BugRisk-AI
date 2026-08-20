@@ -3,6 +3,7 @@
 !.env.example
 node_modules/
 .next/
+.playwright-cli/
 coverage/
 .coverage
 *.log

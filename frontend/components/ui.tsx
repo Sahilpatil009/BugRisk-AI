@@ -5,13 +5,13 @@ import type { ButtonHTMLAttributes, HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex h-10 items-center justify-center rounded-full border-2 border-ink px-4 font-mono text-xs font-extrabold uppercase tracking-[.05em] transition-[transform,box-shadow,background-color] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "bg-cyan-300 text-slate-950 hover:bg-cyan-200",
-        secondary: "border border-white/12 bg-white/5 text-slate-100 hover:bg-white/10",
-        ghost: "text-slate-300 hover:bg-white/5 hover:text-white",
+        primary: "bg-ink text-white shadow-[4px_4px_0_#cf4a80] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#cf4a80]",
+        secondary: "bg-paper text-ink shadow-[3px_3px_0_#191919] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0_#191919]",
+        ghost: "border-transparent text-ink hover:border-ink hover:bg-butter",
       },
     },
     defaultVariants: { variant: "primary" },
@@ -24,10 +24,9 @@ export function Button({ className, variant, asChild, ...props }: ButtonHTMLAttr
 }
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-2xl border border-white/10 bg-slate-900/70 shadow-2xl shadow-slate-950/20 backdrop-blur", className)} {...props} />;
+  return <div className={cn("editorial-card rounded-2xl", className)} {...props} />;
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-xl bg-white/8", className)} aria-hidden />;
+  return <div className={cn("animate-pulse rounded-xl border-2 border-ink/20 bg-sand", className)} aria-hidden />;
 }
-

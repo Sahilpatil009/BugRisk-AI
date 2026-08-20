@@ -1,22 +1,23 @@
-import { Activity, Github, LayoutDashboard } from "lucide-react";
+import { Activity, Github, LayoutDashboard, ScanSearch } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { authUrl } from "@/lib/api";
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-white/8 bg-slate-950/85 backdrop-blur-xl">
+    <div className="min-h-screen text-ink">
+      <header className="sticky top-0 z-20 border-b-2 border-ink bg-canvas/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <Link href="/" className="flex items-center gap-2 font-bold tracking-tight"><span className="grid size-9 place-items-center rounded-xl bg-cyan-300 text-slate-950"><Activity size={19} /></span>BugRisk AI</Link>
-          <nav className="flex items-center gap-1 text-sm" aria-label="Primary navigation">
-            <Link className="rounded-lg px-3 py-2 text-slate-300 hover:bg-white/5 hover:text-white" href="/dashboard"><LayoutDashboard className="mr-1.5 inline" size={15} />Dashboard</Link>
-            <Link className="rounded-lg px-3 py-2 text-slate-300 hover:bg-white/5 hover:text-white" href="/models"><Activity className="mr-1.5 inline" size={15} />Model</Link>
-            <a className="hidden rounded-lg px-3 py-2 text-slate-300 hover:bg-white/5 hover:text-white sm:block" href="https://github.com" target="_blank" rel="noreferrer"><Github className="mr-1.5 inline" size={15} />GitHub</a>
+          <Link href="/" className="flex items-center gap-2.5 font-mono text-sm font-black tracking-tight"><span className="grid size-9 place-items-center rounded-xl border-2 border-ink bg-pink shadow-[3px_3px_0_#191919]"><ScanSearch size={18} /></span>BUGRISK<span className="text-[#a13363]">.AI</span></Link>
+          <nav className="flex items-center gap-1 font-mono text-[11px] font-bold uppercase" aria-label="Primary navigation">
+            <Link aria-label="Dashboard" className="rounded-full px-3 py-2 hover:bg-butter" href="/dashboard"><LayoutDashboard className="mr-1.5 inline" size={14} /><span className="hidden sm:inline">Dashboard</span></Link>
+            <Link aria-label="Model card" className="rounded-full px-3 py-2 hover:bg-lilac" href="/models"><Activity className="mr-1.5 inline" size={14} /><span className="hidden sm:inline">Model card</span></Link>
+            <a aria-label="Connect GitHub" className="hidden rounded-full px-3 py-2 hover:bg-sky md:block" href={authUrl}><Github className="mr-1.5 inline" size={14} />Connect GitHub</a>
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-5 py-8">{children}</main>
+      <main className="page-enter mx-auto max-w-7xl px-5 py-8 sm:py-10">{children}</main>
     </div>
   );
 }
-
