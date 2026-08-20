@@ -1,0 +1,30 @@
+Metadata-Version: 2.4
+Name: bugrisk-backend
+Version: 0.1.0
+Summary: BugRisk AI API and repository analysis worker
+Requires-Python: >=3.11
+Requires-Dist: fastapi<1,>=0.115
+Requires-Dist: uvicorn[standard]<1,>=0.30
+Requires-Dist: sqlalchemy<3,>=2.0
+Requires-Dist: psycopg[binary]<4,>=3.2
+Requires-Dist: pydantic-settings<3,>=2.6
+Requires-Dist: httpx<1,>=0.27
+Requires-Dist: itsdangerous<3,>=2.2
+Requires-Dist: cryptography<46,>=43
+Requires-Dist: gitpython<4,>=3.1
+Requires-Dist: pydriller<3,>=2.7
+Requires-Dist: radon<7,>=6
+Requires-Dist: joblib<2,>=1.4
+Requires-Dist: numpy<3,>=2.0
+Requires-Dist: scikit-learn<2,>=1.5
+Requires-Dist: xgboost<4,>=2.1
+Requires-Dist: shap<1,>=0.46
+Provides-Extra: dev
+Requires-Dist: pytest<9,>=8; extra == "dev"
+Requires-Dist: pytest-cov<7,>=5; extra == "dev"
+Requires-Dist: ruff<1,>=0.8; extra == "dev"
+Requires-Dist: mypy<2,>=1.13; extra == "dev"
+Provides-Extra: ml
+Requires-Dist: pandas<3,>=2.2; extra == "ml"
+Requires-Dist: mlflow<4,>=2.18; extra == "ml"
+Requires-Dist: dvc<4,>=3.56; extra == "ml"

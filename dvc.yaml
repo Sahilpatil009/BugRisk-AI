@@ -1,0 +1,23 @@
+stages:
+  acquire:
+    cmd: python scripts/fetch_apachejit.py --output ml/data/raw/apachejit.csv
+    deps:
+      - scripts/fetch_apachejit.py
+    outs:
+      - ml/data/raw/apachejit.csv
+  preprocess:
+    cmd: python -m ml.preprocessing.prepare --input ml/data/raw/apachejit.csv --output ml/data/processed/apachejit.csv
+    deps:
+      - ml/data/raw/apachejit.csv
+      - ml/preprocessing/prepare.py
+    outs:
+      - ml/data/processed/apachejit.csv
+  train:
+    cmd: python -m ml.training.train --data ml/data/processed/apachejit.csv --output ml/artifacts
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/training/train.py
+      - ml/features/schema.py
+    outs:
+      - ml/artifacts/bugrisk_model.joblib
+      - ml/artifacts/metrics.json

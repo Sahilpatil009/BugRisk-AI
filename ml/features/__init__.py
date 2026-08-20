@@ -1,0 +1,3 @@
+from .schema import FEATURE_ALIASES, FEATURE_NAMES
+
+__all__ = ["FEATURE_ALIASES", "FEATURE_NAMES"]

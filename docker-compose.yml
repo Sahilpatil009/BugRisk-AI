@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bugrisk
+      POSTGRES_USER: bugrisk
+      POSTGRES_PASSWORD: bugrisk
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bugrisk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - bugrisk-postgres:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://bugrisk:bugrisk@postgres:5432/bugrisk
+      INLINE_WORKER: "false"
+      MODEL_PATH: /models/bugrisk_model.joblib
+    ports: ["8000:8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./ml/artifacts:/models:ro
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://bugrisk:bugrisk@postgres:5432/bugrisk
+      INLINE_WORKER: "false"
+      MODEL_PATH: /models/bugrisk_model.joblib
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./ml/artifacts:/models:ro
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [backend]
+
+volumes:
+  bugrisk-postgres:
