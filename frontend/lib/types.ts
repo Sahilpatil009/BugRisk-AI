@@ -12,6 +12,8 @@ export interface Repository {
   created_at: string;
 }
 
+export type GitHubRepository = Omit<Repository, "id" | "created_at">;
+
 export interface Analysis {
   id: string;
   repository_id: string;
@@ -59,4 +61,3 @@ export interface ModelMetrics {
   feature_names: string[];
   note?: string;
 }
-

@@ -5,6 +5,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from app.risk import CalibratedRiskModel
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -13,6 +14,7 @@ from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
     f1_score,
+    fbeta_score,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -21,7 +23,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from backend.app.risk import CalibratedRiskModel
 from ml.features.schema import FEATURE_NAMES
 
 
@@ -60,17 +61,37 @@ def _pipeline(classifier, scale: bool = False) -> Pipeline:
 
 
 def _metrics(
-    labels: pd.Series, probability: np.ndarray
+    labels: pd.Series, probability: np.ndarray, threshold: float = 0.5
 ) -> dict[str, float | list[list[int]]]:
-    predicted = (probability >= 0.5).astype(int)
+    predicted = (probability >= threshold).astype(int)
     return {
         "precision": float(precision_score(labels, predicted, zero_division=0)),
         "recall": float(recall_score(labels, predicted, zero_division=0)),
         "f1": float(f1_score(labels, predicted, zero_division=0)),
+        "f2": float(fbeta_score(labels, predicted, beta=2, zero_division=0)),
         "roc_auc": float(roc_auc_score(labels, probability)),
         "pr_auc": float(average_precision_score(labels, probability)),
+        "decision_threshold": float(threshold),
         "confusion_matrix": confusion_matrix(labels, predicted).tolist(),
     }
+
+
+def select_operating_threshold(labels: pd.Series, probability: np.ndarray) -> float:
+    """Choose a recall-aware threshold on validation data using the F2 score."""
+    best: tuple[tuple[float, float, float, float], float] | None = None
+    for threshold in np.linspace(0.05, 0.5, 91):
+        predicted = (probability >= threshold).astype(int)
+        score = (
+            float(fbeta_score(labels, predicted, beta=2, zero_division=0)),
+            float(recall_score(labels, predicted, zero_division=0)),
+            float(precision_score(labels, predicted, zero_division=0)),
+            float(threshold),
+        )
+        if best is None or score > best[0]:
+            best = (score, float(threshold))
+    if best is None:
+        raise ValueError("Cannot select an operating threshold without validation data")
+    return best[1]
 
 
 def train(data_path: Path, output: Path) -> dict:
@@ -131,8 +152,13 @@ def train(data_path: Path, output: Path) -> dict:
         y_validation,
     )
     calibrated = CalibratedRiskModel(selected, calibrator)
-    test_metrics = _metrics(y_test, calibrated.predict_proba(x_test)[:, 1])
-    model_version = f"apachejit-{selected_name}-v1"
+    decision_threshold = select_operating_threshold(
+        y_validation, calibrated.predict_proba(x_validation)[:, 1]
+    )
+    test_metrics = _metrics(
+        y_test, calibrated.predict_proba(x_test)[:, 1], decision_threshold
+    )
+    model_version = f"apachejit-{selected_name}-v2"
     numeric_metrics = {
         key: value for key, value in test_metrics.items() if isinstance(value, float)
     }
@@ -140,6 +166,7 @@ def train(data_path: Path, output: Path) -> dict:
         "model": calibrated,
         "model_version": model_version,
         "model_name": selected_name,
+        "decision_threshold": decision_threshold,
         "feature_names": FEATURE_NAMES,
         "metrics": numeric_metrics,
         "validation_metrics": validation_metrics,

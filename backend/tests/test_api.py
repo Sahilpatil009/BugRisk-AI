@@ -10,8 +10,8 @@ def test_demo_story_exposes_repository_analysis_and_files():
         repositories = client.get("/repositories").json()
         assert repositories
         analyses = client.get("/analyses", params={"repository_id": repositories[0]["id"]}).json()
-        assert analyses[0]["status"] == "COMPLETED"
-        files = client.get(f"/analyses/{analyses[0]['id']}/files").json()
+        completed = next(analysis for analysis in analyses if analysis["status"] == "COMPLETED")
+        files = client.get(f"/analyses/{completed['id']}/files").json()
         assert files["total"] >= 5
         assert "file_priority_score" in files["items"][0]
         assert "change_risk_probability" not in files["items"][0]

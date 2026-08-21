@@ -21,6 +21,14 @@ a claim that the file contains a bug.
 GitHub PR comments, CodeBERT, GRU, and GNN models are intentionally deferred until after the
 MVP baseline is validated.
 
+## Interface preview
+
+| Landing page | Repository dashboard |
+| --- | --- |
+| ![BugRisk AI landing page](preview-redesign-landing.png) | ![BugRisk AI repository dashboard](preview-redesign-dashboard.png) |
+
+![BugRisk AI mobile landing page](preview-redesign-mobile.png)
+
 ## Quick start: demo mode
 
 Requirements: Python 3.11+, Node.js 22+, pnpm 11+, and Git.
@@ -39,8 +47,8 @@ In another terminal:
 
 ```powershell
 Set-Location frontend
-pnpm install
-pnpm dev
+corepack pnpm install
+corepack pnpm dev
 ```
 
 Open `http://localhost:3000/dashboard`. With `DEMO_MODE=true`, the API seeds one completed
@@ -59,7 +67,10 @@ dvc repro
 
 The stages download the dataset, normalize its feature columns, split each project in temporal
 60/20/20 order, compare Logistic Regression, Random Forest, and XGBoost, calibrate the selected
-model, and export `ml/artifacts/bugrisk_model.joblib`. DVC records dataset and pipeline hashes;
+model, select a recall-aware F2 operating threshold on validation data, and export
+`ml/artifacts/bugrisk_model.joblib`. The threshold is used for evaluation reporting only; the
+API continues to return calibrated probabilities and the fixed product risk bands. DVC records
+dataset and pipeline hashes;
 MLflow records the selected model and test metrics when installed.
 
 ## GitHub OAuth
@@ -73,6 +84,13 @@ http://localhost:8000/auth/github/callback
 Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, a random `SESSION_SECRET` of at least 32
 characters, and a Fernet `TOKEN_ENCRYPTION_KEY`. Disable demo mode. Tokens are encrypted before
 storage and are never sent to the frontend or placed in Git command arguments.
+
+## Supabase
+
+Create a Supabase project, open its SQL editor, and apply
+`backend/supabase/migrations/001_initial_schema.sql`. Set `DATABASE_URL` to the pooled PostgreSQL
+connection string used by the API and worker. The migration enables ownership RLS policies on
+all seven application tables; the API also performs explicit ownership checks.
 
 ## Docker
 
@@ -93,10 +111,10 @@ python -m mypy --config-file backend/pyproject.toml --explicit-package-bases bac
 python -m pytest backend/tests ml/tests --cov=backend/app
 
 Set-Location frontend
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
 ```
 
 See [architecture](docs/architecture.md), [deployment](docs/deployment.md), and

@@ -1,6 +1,8 @@
 import logging
+from typing import Any, cast
 
 from sqlalchemy import update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from .analyzer import analyze_repository
@@ -26,10 +28,13 @@ def process_analysis(analysis_id: str) -> None:
     settings = get_settings()
     db: Session = SessionLocal()
     try:
-        claimed = db.execute(
-            update(Analysis)
-            .where(Analysis.id == analysis_id, Analysis.status == AnalysisStatus.QUEUED)
-            .values(status=AnalysisStatus.ANALYZING)
+        claimed = cast(
+            CursorResult[Any],
+            db.execute(
+                update(Analysis)
+                .where(Analysis.id == analysis_id, Analysis.status == AnalysisStatus.QUEUED)
+                .values(status=AnalysisStatus.ANALYZING)
+            ),
         )
         if claimed.rowcount != 1:
             db.rollback()

@@ -13,7 +13,7 @@ jobs:
       - run: pip install -e './backend[dev,ml]'
       - run: ruff check backend ml
       - run: mypy --config-file backend/pyproject.toml --explicit-package-bases backend/app ml
-      - run: pytest backend/tests ml/tests --cov=backend/app
+      - run: python -m pytest backend/tests ml/tests --cov=backend/app
 
   frontend:
     runs-on: ubuntu-latest

@@ -15,7 +15,7 @@ def fetch(output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="apachejit-") as directory:
         archive = Path(directory) / "apachejit.zip"
-        urllib.request.urlretrieve(DATASET_URL, archive)  # noqa: S310
+        urllib.request.urlretrieve(DATASET_URL, archive)
         with zipfile.ZipFile(archive) as bundle:
             matches = [name for name in bundle.namelist() if name.endswith("apachejit_total.csv")]
             if len(matches) != 1:
@@ -33,4 +33,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
