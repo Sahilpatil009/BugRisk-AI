@@ -21,6 +21,14 @@ a claim that the file contains a bug.
 GitHub PR comments, CodeBERT, GRU, and GNN models are intentionally deferred until after the
 MVP baseline is validated.
 
+## Interface preview
+
+| Landing page | Repository dashboard |
+| --- | --- |
+| ![BugRisk AI landing page](preview-redesign-landing.png) | ![BugRisk AI repository dashboard](preview-redesign-dashboard.png) |
+
+![BugRisk AI mobile landing page](preview-redesign-mobile.png)
+
 ## Quick start: demo mode
 
 Requirements: Python 3.11+, Node.js 22+, pnpm 11+, and Git.
@@ -39,8 +47,8 @@ In another terminal:
 
 ```powershell
 Set-Location frontend
-pnpm install
-pnpm dev
+corepack pnpm install
+corepack pnpm dev
 ```
 
 Open `http://localhost:3000/dashboard`. With `DEMO_MODE=true`, the API seeds one completed
@@ -103,10 +111,10 @@ python -m mypy --config-file backend/pyproject.toml --explicit-package-bases bac
 python -m pytest backend/tests ml/tests --cov=backend/app
 
 Set-Location frontend
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
 ```
 
 See [architecture](docs/architecture.md), [deployment](docs/deployment.md), and

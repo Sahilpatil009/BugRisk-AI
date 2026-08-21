@@ -1,26 +1,79 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Clock3, FolderGit2, GitBranch, Loader2, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Clock3, FolderGit2, GitBranch, Github, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { RiskBadge } from "@/components/risk-badge";
-import { Card, Skeleton } from "@/components/ui";
-import { api, percent } from "@/lib/api";
-import type { Analysis, Repository } from "@/lib/types";
+import { Button, Card, Skeleton } from "@/components/ui";
+import { api, authUrl, percent } from "@/lib/api";
+import type { Analysis, GitHubRepository, Repository } from "@/lib/types";
 
 export function DashboardClient() {
+  const router = useRouter();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [githubRepositories, setGithubRepositories] = useState<GitHubRepository[]>([]);
+  const [selectedRepositoryId, setSelectedRepositoryId] = useState("");
+  const [githubLoading, setGithubLoading] = useState(true);
+  const [githubError, setGithubError] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api<Repository[]>("/repositories"), api<Analysis[]>("/analyses")])
-      .then(([repoData, analysisData]) => { setRepositories(repoData); setAnalyses(analysisData); })
-      .catch((reason: Error) => setError(reason.message))
-      .finally(() => setLoading(false));
+    async function loadDashboard() {
+      try {
+        const githubRequest = api<GitHubRepository[]>("/repositories/github")
+          .then((data) => ({ data, error: null }))
+          .catch((reason: unknown) => ({
+            data: [] as GitHubRepository[],
+            error: reason instanceof Error ? reason.message : "GitHub repositories are unavailable",
+          }));
+        const [repoData, analysisData, githubResult] = await Promise.all([
+          api<Repository[]>("/repositories"),
+          api<Analysis[]>("/analyses"),
+          githubRequest,
+        ]);
+        setRepositories(repoData);
+        setAnalyses(analysisData);
+        setGithubRepositories(githubResult.data);
+        setGithubError(githubResult.error);
+        const firstUnconnected = githubResult.data.find(
+          (candidate) => !repoData.some((item) => item.github_repo_id === candidate.github_repo_id),
+        );
+        setSelectedRepositoryId(firstUnconnected?.github_repo_id ?? githubResult.data[0]?.github_repo_id ?? "");
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Dashboard unavailable");
+      } finally {
+        setGithubLoading(false);
+        setLoading(false);
+      }
+    }
+
+    void loadDashboard();
   }, []);
+
+  async function connectRepository() {
+    const selected = githubRepositories.find((item) => item.github_repo_id === selectedRepositoryId);
+    if (!selected) return;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const connected = await api<Repository>("/repositories/connect", {
+        method: "POST",
+        body: JSON.stringify(selected),
+      });
+      setRepositories((current) => current.some((item) => item.id === connected.id) ? current : [connected, ...current]);
+      router.push(`/repository/${connected.id}`);
+    } catch (reason) {
+      setConnectError(reason instanceof Error ? reason.message : "Repository could not be connected");
+    } finally {
+      setConnecting(false);
+    }
+  }
 
   if (loading) return <div aria-label="Loading dashboard" className="grid gap-5 md:grid-cols-3"><Skeleton className="h-44" /><Skeleton className="h-44" /><Skeleton className="h-44" /></div>;
   if (error) return <Card className="flex items-start gap-3 bg-pink p-6 text-[#711b42]"><AlertCircle /><div><h2 className="font-black">Dashboard unavailable</h2><p className="mt-1 text-sm">{error}</p></div></Card>;
@@ -43,6 +96,11 @@ export function DashboardClient() {
       </section>
 
       {active.length > 0 ? <Card className="overflow-hidden bg-butter"><div className="progress-stripes h-2 bg-[#d89020]" /><div className="flex items-center gap-3 p-5"><Loader2 className="animate-spin" size={20} /><div><p className="font-black">{active.length} analysis{active.length === 1 ? "" : "es"} in progress</p><p className="mt-1 text-sm text-muted-ink">This workspace updates when the analysis worker finishes.</p></div></div></Card> : null}
+
+      <section aria-labelledby="connect-repository-heading">
+        <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="section-kicker">GitHub connection</p><h2 id="connect-repository-heading" className="mt-3 text-2xl font-black">Connect a Python repository</h2><p className="mt-1 text-sm text-muted-ink">Choose a repository to create a private BugRisk workspace for it.</p></div><span className="font-mono text-xs font-bold text-muted-ink">{githubRepositories.length} AVAILABLE</span></div>
+        {githubLoading ? <Skeleton className="h-28" /> : githubError ? <Card className="flex flex-col items-start gap-4 bg-butter p-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 shrink-0" /><div><h3 className="font-black">Reconnect GitHub</h3><p className="mt-1 text-sm text-muted-ink">{githubError}</p></div></div><Button asChild variant="secondary"><a href={authUrl}><Github size={16} /> Connect GitHub</a></Button></Card> : githubRepositories.length === 0 ? <Card className="p-6"><p className="font-black">No GitHub repositories are available.</p><p className="mt-1 text-sm text-muted-ink">Create or grant access to a repository, then return here.</p></Card> : <Card className="bg-sky p-5 sm:p-6"><div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end"><label className="block"><span className="mb-2 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-wider"><Github size={15} /> Repository</span><select className="h-12 w-full rounded-xl border-2 border-ink bg-paper px-4 text-sm font-bold outline-none focus-visible:ring-4 focus-visible:ring-[#cf4a80]/35" value={selectedRepositoryId} onChange={(event) => setSelectedRepositoryId(event.target.value)}>{githubRepositories.map((repository) => { const connected = repositories.some((item) => item.github_repo_id === repository.github_repo_id); return <option key={repository.github_repo_id} value={repository.github_repo_id}>{repository.owner}/{repository.name}{repository.is_private ? " · private" : ""}{connected ? " · connected" : ""}</option>; })}</select></label><Button className="h-12 gap-2 px-6" onClick={connectRepository} disabled={!selectedRepositoryId || connecting}>{connecting ? <Loader2 className="animate-spin" size={16} /> : <LockKeyhole size={16} />}{connecting ? "Connecting" : "Connect repository"}</Button></div><p className="mt-3 text-xs font-semibold text-muted-ink">Only Python files are analyzed. GitHub access stays server-side and encrypted.</p>{connectError ? <p role="alert" className="mt-3 font-mono text-xs font-bold text-[#8d1748]">{connectError}</p> : null}</Card>}
+      </section>
 
       <section>
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="section-kicker">Your workspace</p><h2 className="mt-3 text-2xl font-black">Repositories</h2><p className="mt-1 text-sm text-muted-ink">Open a repository to inspect its latest analysis and ranked files.</p></div><span className="font-mono text-xs font-bold text-muted-ink">{repositories.length} CONNECTED</span></div>

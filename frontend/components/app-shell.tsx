@@ -1,8 +1,8 @@
-import { Activity, Github, LayoutDashboard, ScanSearch } from "lucide-react";
+import { Activity, LayoutDashboard, ScanSearch } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { authUrl } from "@/lib/api";
+import { LogoutButton } from "@/components/logout-button";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex items-center gap-1 font-mono text-[11px] font-bold uppercase" aria-label="Primary navigation">
             <Link aria-label="Dashboard" className="rounded-full px-3 py-2 hover:bg-butter" href="/dashboard"><LayoutDashboard className="mr-1.5 inline" size={14} /><span className="hidden sm:inline">Dashboard</span></Link>
             <Link aria-label="Model card" className="rounded-full px-3 py-2 hover:bg-lilac" href="/models"><Activity className="mr-1.5 inline" size={14} /><span className="hidden sm:inline">Model card</span></Link>
-            <a aria-label="Connect GitHub" className="hidden rounded-full px-3 py-2 hover:bg-sky md:block" href={authUrl}><Github className="mr-1.5 inline" size={14} />Connect GitHub</a>
+            <LogoutButton />
           </nav>
         </div>
       </header>
