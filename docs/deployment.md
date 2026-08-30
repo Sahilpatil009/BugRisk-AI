@@ -8,7 +8,7 @@ public Next.js variables are embedded in the browser bundle.
 
 ## API with an inline worker on Render
 
-The included `render.yaml` defines one free-tier web service with analysis jobs handled inside the
+The included `render.yaml` explicitly selects Render's `free` plan for one web service, with analysis jobs handled inside the
 API process. Configure
 `DATABASE_URL`, `FRONTEND_URL`, `BACKEND_URL`, GitHub OAuth credentials, `SESSION_SECRET`, and
 `TOKEN_ENCRYPTION_KEY`.

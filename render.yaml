@@ -2,6 +2,7 @@ services:
   - type: web
     name: bugrisk-api
     runtime: docker
+    plan: free
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /health
