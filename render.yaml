@@ -23,27 +23,8 @@ services:
       - key: DEMO_MODE
         value: false
       - key: INLINE_WORKER
-        value: false
+        value: true
       - key: MODEL_PATH
         value: /models/bugrisk_model.joblib
       - key: COOKIE_SAME_SITE
         value: none
-  - type: worker
-    name: bugrisk-worker
-    runtime: docker
-    dockerContext: ./backend
-    dockerfilePath: ./backend/Dockerfile
-    dockerCommand: python -m app.worker
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: SESSION_SECRET
-        sync: false
-      - key: TOKEN_ENCRYPTION_KEY
-        sync: false
-      - key: DEMO_MODE
-        value: false
-      - key: INLINE_WORKER
-        value: false
-      - key: MODEL_PATH
-        value: /models/bugrisk_model.joblib
