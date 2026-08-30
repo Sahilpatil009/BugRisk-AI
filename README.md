@@ -27,7 +27,6 @@ MVP baseline is validated.
 | --- | --- |
 | ![BugRisk AI landing page](preview-redesign-landing.png) | ![BugRisk AI repository dashboard](preview-redesign-dashboard.png) |
 
-![BugRisk AI mobile landing page](preview-redesign-mobile.png)
 
 ## Quick start: demo mode
 
