@@ -12,12 +12,20 @@ services:
         generateValue: true
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
       - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
         sync: false
       - key: DEMO_MODE
         value: false
+      - key: INLINE_WORKER
+        value: false
       - key: MODEL_PATH
-        sync: false
+        value: /models/bugrisk_model.joblib
       - key: COOKIE_SAME_SITE
         value: none
   - type: worker
@@ -35,5 +43,7 @@ services:
         sync: false
       - key: DEMO_MODE
         value: false
+      - key: INLINE_WORKER
+        value: false
       - key: MODEL_PATH
-        sync: false
+        value: /models/bugrisk_model.joblib
