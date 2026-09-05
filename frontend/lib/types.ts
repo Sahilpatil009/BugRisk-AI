@@ -61,3 +61,22 @@ export interface ModelMetrics {
   feature_names: string[];
   note?: string;
 }
+
+export interface PullRequest {
+  id: string;
+  repository_id: string;
+  analysis_id: string | null;
+  github_pr_number: number;
+  title: string;
+  author: string;
+  html_url: string;
+  base_sha: string;
+  head_sha: string;
+  state: string;
+  status: AnalysisStatus;
+  risk_score: number | null;
+  risk_level: RiskLevel | null;
+  changed_files: string[];
+  created_at: string;
+  updated_at: string;
+}

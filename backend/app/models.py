@@ -66,6 +66,9 @@ class Repository(Base):
     analyses: Mapped[list["Analysis"]] = relationship(
         back_populates="repository", cascade="all, delete"
     )
+    pull_requests: Mapped[list["PullRequest"]] = relationship(
+        back_populates="repository", cascade="all, delete"
+    )
 
 
 class Analysis(Base):
@@ -156,3 +159,37 @@ class Recommendation(Base):
     text: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(32), default="deterministic")
     prediction: Mapped[Prediction] = relationship(back_populates="recommendations")
+
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+    __table_args__ = (UniqueConstraint("repository_id", "github_pr_number"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    repository_id: Mapped[str] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), index=True
+    )
+    analysis_id: Mapped[str | None] = mapped_column(
+        ForeignKey("analyses.id", ondelete="SET NULL"), index=True
+    )
+    github_pr_number: Mapped[int] = mapped_column(Integer)
+    installation_id: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(500))
+    author: Mapped[str] = mapped_column(String(255))
+    html_url: Mapped[str] = mapped_column(Text)
+    base_sha: Mapped[str] = mapped_column(String(64))
+    head_sha: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(32), default="open")
+    status: Mapped[AnalysisStatus] = mapped_column(
+        Enum(AnalysisStatus), default=AnalysisStatus.QUEUED, index=True
+    )
+    risk_score: Mapped[float | None] = mapped_column(Float)
+    risk_level: Mapped[RiskLevel | None] = mapped_column(Enum(RiskLevel))
+    changed_files: Mapped[list[str]] = mapped_column(JSON, default=list)
+    github_comment_id: Mapped[str | None] = mapped_column(String(64))
+    last_delivery_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    repository: Mapped[Repository] = relationship(back_populates="pull_requests")
+    analysis: Mapped[Analysis | None] = relationship()

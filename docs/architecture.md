@@ -2,6 +2,9 @@
 
 ```text
 Browser -> Next.js dashboard -> FastAPI -> PostgreSQL / Supabase
+GitHub PR -> signed webhook ----^             |
+       ^                                      +-> pull request state
+       +---- updated risk comment <--- GitHub App installation token
                                   |
                                   +-> analysis queue <- Python worker
                                                         |
@@ -31,6 +34,11 @@ Repository source is cloned into an OS temporary directory and removed on succes
 Private credentials are passed through Git's process environment as an HTTP header, not embedded
 in a clone URL.
 
+For pull requests, the webhook handler verifies the raw-body HMAC, deduplicates the GitHub delivery,
+fetches the changed-file list with a short-lived installation token, and queues the PR head SHA.
+The analyzer fetches GitHub's pull ref and limits results to changed Python paths. A completed run
+creates or updates one pull-request comment so synchronize events do not accumulate stale reports.
+
 ## Persistence and isolation
 
 SQLite provides a credential-free demo. Production uses `DATABASE_URL` with PostgreSQL/Supabase.
@@ -45,4 +53,3 @@ The MVP recommendation engine is deterministic and based only on SHAP evidence a
 A future LLM adapter may rewrite those actions into friendlier prose, but it must accept and
 return a schema that contains no writable score fields. Invalid or unavailable provider output
 falls back to the deterministic actions.
-

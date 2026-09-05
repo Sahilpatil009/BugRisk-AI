@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     token_encryption_key: str | None = None
     github_client_id: str | None = None
     github_client_secret: str | None = None
+    github_app_id: str | None = None
+    github_app_private_key: str | None = None
+    github_webhook_secret: str | None = None
     demo_mode: bool = True
     inline_worker: bool = True
     model_path: Path = Field(default=Path("../ml/artifacts/bugrisk_model.joblib"))
@@ -28,6 +31,12 @@ class Settings(BaseSettings):
     @property
     def secure_cookies(self) -> bool:
         return self.backend_url.startswith("https://")
+
+    @property
+    def normalized_github_app_private_key(self) -> str | None:
+        if not self.github_app_private_key:
+            return None
+        return self.github_app_private_key.replace("\\n", "\n")
 
 
 @lru_cache
