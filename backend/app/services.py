@@ -1,7 +1,8 @@
+import asyncio
 import logging
 from typing import Any, cast
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
@@ -9,12 +10,14 @@ from .analyzer import analyze_repository
 from .auth import decrypt_token
 from .config import get_settings
 from .database import SessionLocal
+from .github_app import publish_pull_request_report
 from .models import (
     Analysis,
     AnalysisStatus,
     FileResult,
     ModelExplanation,
     Prediction,
+    PullRequest,
     Recommendation,
     utcnow,
 )
@@ -46,11 +49,25 @@ def process_analysis(analysis_id: str) -> None:
         analysis.error_message = None
         db.commit()
         repository = analysis.repository
+        pull_request = db.scalar(select(PullRequest).where(PullRequest.analysis_id == analysis.id))
+        if pull_request:
+            pull_request.status = AnalysisStatus.ANALYZING
+            pull_request.updated_at = utcnow()
+            db.commit()
         token = decrypt_token(repository_user_token(repository), settings)
         snapshot = analyze_repository(
-            repository.url, repository.default_branch, token, analysis.commit_sha
+            repository.url,
+            repository.default_branch,
+            token,
+            analysis.commit_sha,
+            changed_paths=pull_request.changed_files if pull_request else None,
+            base_sha=pull_request.base_sha if pull_request else None,
+            pull_request_number=pull_request.github_pr_number if pull_request else None,
         )
         analysis.status = AnalysisStatus.PREDICTING
+        if pull_request:
+            pull_request.status = AnalysisStatus.PREDICTING
+            pull_request.updated_at = utcnow()
         analysis.commit_sha = snapshot.commit_sha
         db.commit()
 
@@ -110,11 +127,31 @@ def process_analysis(analysis_id: str) -> None:
             )
         analysis.change_risk_probability = prediction.probability
         analysis.overall_priority_score = max(priorities, default=prediction.probability)
-        analysis.risk_level = risk_level(analysis.overall_priority_score)
+        analysis.risk_level = risk_level(prediction.probability)
         analysis.model_version = prediction.model_version
         analysis.status = AnalysisStatus.COMPLETED
         analysis.completed_at = utcnow()
+        if pull_request:
+            pull_request.status = AnalysisStatus.COMPLETED
+            pull_request.risk_score = analysis.change_risk_probability
+            pull_request.risk_level = analysis.risk_level
+            pull_request.updated_at = utcnow()
         db.commit()
+        if pull_request:
+            try:
+                comment_id = asyncio.run(
+                    publish_pull_request_report(
+                        settings, pull_request, analysis, list(analysis.files)
+                    )
+                )
+                pull_request.github_comment_id = comment_id
+                pull_request.updated_at = utcnow()
+                db.commit()
+            except Exception:
+                logger.exception(
+                    "pull_request_comment_failed",
+                    extra={"analysis_id": analysis_id, "pull_request_id": pull_request.id},
+                )
     except Exception as exc:
         logger.exception("analysis_failed", extra={"analysis_id": analysis_id})
         db.rollback()
@@ -123,6 +160,12 @@ def process_analysis(analysis_id: str) -> None:
             analysis.status = AnalysisStatus.FAILED
             analysis.error_message = str(exc)[:1000]
             analysis.completed_at = utcnow()
+            pull_request = db.scalar(
+                select(PullRequest).where(PullRequest.analysis_id == analysis.id)
+            )
+            if pull_request:
+                pull_request.status = AnalysisStatus.FAILED
+                pull_request.updated_at = utcnow()
             db.commit()
     finally:
         db.close()

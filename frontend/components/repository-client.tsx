@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDownUp, ArrowRight, GitCommitHorizontal, History, Loader2, Play, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, ArrowRight, GitCommitHorizontal, GitPullRequest, History, Loader2, Play, RefreshCw, ShieldCheck } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -75,7 +75,7 @@ export function RepositoryClient({ repositoryId }: { repositoryId: string }) {
     <div className="space-y-8">
       <section className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
         <div><p className="section-kicker">{repository.owner} / {repository.default_branch}</p><h1 className="mt-4 break-words text-4xl font-black tracking-[-.04em] sm:text-5xl">{repository.name}</h1><p className="mt-3 flex items-center gap-2 font-mono text-xs text-muted-ink"><GitCommitHorizontal size={15} />{selected?.commit_sha?.slice(0, 10) ?? "No analyzed commit"}</p></div>
-        <Button onClick={startAnalysis} disabled={isActive} className="h-12 px-6">{isActive ? <Loader2 className="mr-2 animate-spin" size={16} /> : <Play className="mr-2" size={16} />}{isActive ? "Analysis running" : "Analyze latest commit"}</Button>
+        <div className="flex flex-wrap gap-3"><Button asChild variant="secondary" className="h-12 px-6"><Link href={`/repository/${repository.id}/pull-requests`}><GitPullRequest className="mr-2" size={16} />Pull requests</Link></Button><Button onClick={startAnalysis} disabled={isActive} className="h-12 px-6">{isActive ? <Loader2 className="mr-2 animate-spin" size={16} /> : <Play className="mr-2" size={16} />}{isActive ? "Analysis running" : "Analyze latest commit"}</Button></div>
       </section>
 
       {error ? <Card className="flex gap-3 bg-pink p-4 text-sm text-[#711b42]"><AlertTriangle className="shrink-0" size={18} />{error}</Card> : null}

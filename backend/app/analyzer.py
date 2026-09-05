@@ -57,7 +57,14 @@ def _clone_environment(token: str | None) -> dict[str, str]:
 
 
 def analyze_repository(
-    url: str, branch: str, token: str | None = None, commit_sha: str | None = None
+    url: str,
+    branch: str,
+    token: str | None = None,
+    commit_sha: str | None = None,
+    *,
+    changed_paths: list[str] | None = None,
+    base_sha: str | None = None,
+    pull_request_number: int | None = None,
 ) -> RepositorySnapshot:
     with tempfile.TemporaryDirectory(prefix="bugrisk-") as directory:
         with Repo.clone_from(
@@ -67,21 +74,57 @@ def analyze_repository(
             env=_clone_environment(token),
             multi_options=["--depth=100"],
         ) as repo:
-            return _analyze_clone(repo, directory, commit_sha)
+            if pull_request_number is not None:
+                repo.git.fetch("origin", f"pull/{pull_request_number}/head", depth=100)
+            return _analyze_clone(repo, directory, commit_sha, changed_paths, base_sha)
 
 
-def _analyze_clone(repo: Repo, directory: str, commit_sha: str | None) -> RepositorySnapshot:
+def _diff_stats(
+    repo: Repo, base_sha: str, head_sha: str, changed_paths: list[str] | None
+) -> dict[str, dict[str, int]]:
+    arguments = ["--numstat", f"{base_sha}..{head_sha}"]
+    if changed_paths:
+        arguments.extend(["--", *changed_paths])
+    output = repo.git.diff(*arguments)
+    result: dict[str, dict[str, int]] = {}
+    for line in output.splitlines():
+        added, deleted, path = line.split("\t", 2)
+        result[path] = {
+            "insertions": int(added) if added.isdigit() else 0,
+            "deletions": int(deleted) if deleted.isdigit() else 0,
+            "lines": (int(added) if added.isdigit() else 0)
+            + (int(deleted) if deleted.isdigit() else 0),
+        }
+    return result
+
+
+def _analyze_clone(
+    repo: Repo,
+    directory: str,
+    commit_sha: str | None,
+    changed_paths: list[str] | None = None,
+    base_sha: str | None = None,
+) -> RepositorySnapshot:
     if commit_sha:
         repo.git.checkout(commit_sha)
     head = repo.head.commit
-    python_paths = [path for path in Path(directory).rglob("*.py") if ".git" not in path.parts]
+    if changed_paths is None:
+        python_paths = [path for path in Path(directory).rglob("*.py") if ".git" not in path.parts]
+    else:
+        python_paths = [
+            Path(directory, path)
+            for path in changed_paths
+            if path.endswith(".py") and Path(directory, path).is_file()
+        ]
     if not python_paths:
-        raise ValueError("No Python files were found in the selected repository")
+        raise ValueError("No changed Python files were found in this pull request")
 
     commits = list(repo.iter_commits(max_count=100))
     author_counts = Counter(str(commit.author.email or commit.author.name) for commit in commits)
     head_author = str(head.author.email or head.author.name)
-    stats = head.stats.files
+    stats = (
+        _diff_stats(repo, base_sha, head.hexsha, changed_paths) if base_sha else head.stats.files
+    )
     changes = [int(value.get("lines", 0)) for value in stats.values()]
     added = sum(int(value.get("insertions", 0)) for value in stats.values())
     deleted = sum(int(value.get("deletions", 0)) for value in stats.values())

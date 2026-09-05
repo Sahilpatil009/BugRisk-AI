@@ -134,3 +134,22 @@ class ModelMetrics(BaseModel):
     metrics: dict[str, float]
     feature_names: list[str]
     note: str | None = None
+
+
+class PullRequestOut(ApiModel):
+    id: str
+    repository_id: str
+    analysis_id: str | None
+    github_pr_number: int
+    title: str
+    author: str
+    html_url: str
+    base_sha: str
+    head_sha: str
+    state: str
+    status: AnalysisStatus
+    risk_score: float | None
+    risk_level: RiskLevel | None
+    changed_files: list[str]
+    created_at: datetime
+    updated_at: datetime

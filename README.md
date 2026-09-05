@@ -7,7 +7,7 @@ a claim that the file contains a bug.
 
 ## What is included
 
-- Next.js 16 dashboard with responsive repository, file-evidence, history, and model views.
+- Next.js 16 dashboard with responsive repository, pull-request, file-evidence, history, and model views.
 - FastAPI REST API with GitHub OAuth, encrypted server-side tokens, secure sessions, and
   ownership checks.
 - PostgreSQL/Supabase-ready schema and RLS policies; SQLite is used for the zero-config demo.
@@ -16,10 +16,10 @@ a claim that the file contains a bug.
 - ApacheJIT preprocessing, temporal per-project splits, model comparison, sigmoid calibration,
   SHAP explanations, MLflow logging, and DVC stages.
 - Deterministic, evidence-backed recommendations. No LLM is allowed to create risk scores.
+- Signed GitHub App webhooks for opened/updated pull requests, changed-file analysis, and reusable PR comments.
 - Docker Compose, Render, Vercel, and GitHub Actions configuration.
 
-GitHub PR comments, CodeBERT, GRU, and GNN models are intentionally deferred until after the
-MVP baseline is validated.
+CodeBERT, GRU, and GNN models remain post-MVP research extensions.
 
 ## Interface preview
 
@@ -85,12 +85,20 @@ Set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, a random `SESSION_SECRET` of at 
 characters, and a Fernet `TOKEN_ENCRYPTION_KEY`. Disable demo mode. Tokens are encrypted before
 storage and are never sent to the frontend or placed in Git command arguments.
 
+## GitHub Pull Request automation
+
+Create a GitHub App with webhook URL `https://<backend>/webhooks/github`, enable the pull request
+event, and grant read access to metadata and contents plus read/write access to pull requests.
+Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`. Install the app on a
+connected repository. The `opened` and `synchronize` events create queued analyses restricted to
+the PR's changed Python files. BugRisk AI creates one report comment and updates it on later pushes.
+
 ## Supabase
 
 Create a Supabase project, open its SQL editor, and apply
-`backend/supabase/migrations/001_initial_schema.sql`. Set `DATABASE_URL` to the pooled PostgreSQL
+all SQL files in `backend/supabase/migrations` in numeric order. Set `DATABASE_URL` to the pooled PostgreSQL
 connection string used by the API and worker. The migration enables ownership RLS policies on
-all seven application tables; the API also performs explicit ownership checks.
+all application tables; the API also performs explicit ownership checks.
 
 ## Docker
 

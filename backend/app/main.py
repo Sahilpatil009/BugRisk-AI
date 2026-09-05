@@ -15,7 +15,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from .auth import begin_oauth, current_user, decrypt_token, finish_oauth
 from .config import get_settings
 from .database import Base, SessionLocal, engine, get_db
-from .models import Analysis, FileResult, Repository, User
+from .github_app import installation_token, pull_request_files, verify_webhook_signature
+from .models import Analysis, FileResult, PullRequest, Repository, User, utcnow
 from .risk import ModelService, risk_level
 from .schemas import (
     AnalysisCreate,
@@ -26,6 +27,7 @@ from .schemas import (
     PaginatedFiles,
     PredictionInput,
     PredictionOut,
+    PullRequestOut,
     RepositoryConnect,
     RepositoryOut,
     UserOut,
@@ -175,6 +177,100 @@ def connect_repository(payload: RepositoryConnect, db: Db, user: CurrentUser) ->
     db.commit()
     db.refresh(repository)
     return repository
+
+
+@app.post("/webhooks/github", status_code=202)
+async def github_webhook(request: Request, background: BackgroundTasks, db: Db) -> dict[str, str]:
+    body = await request.body()
+    if not verify_webhook_signature(
+        body, request.headers.get("X-Hub-Signature-256"), settings.github_webhook_secret
+    ):
+        raise HTTPException(401, "Invalid GitHub webhook signature")
+    event = request.headers.get("X-GitHub-Event")
+    if event == "ping":
+        return {"status": "accepted", "event": "ping"}
+    payload = await request.json()
+    action = payload.get("action")
+    if event != "pull_request" or action not in {"opened", "synchronize"}:
+        return {"status": "ignored", "event": event or "unknown"}
+    try:
+        github_repository = payload["repository"]
+        github_pull_request = payload["pull_request"]
+        installation_id = str(payload["installation"]["id"])
+        repository_id = str(github_repository["id"])
+        number = int(payload["number"])
+        head_sha = str(github_pull_request["head"]["sha"])
+        base_sha = str(github_pull_request["base"]["sha"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(400, "Malformed pull request webhook payload") from exc
+    repository = db.scalar(
+        select(Repository)
+        .where(Repository.github_repo_id == repository_id)
+        .order_by(desc(Repository.created_at))
+    )
+    if not repository:
+        return {"status": "ignored", "event": "repository_not_connected"}
+    delivery_id = request.headers.get("X-GitHub-Delivery")
+    pull_request = db.scalar(
+        select(PullRequest).where(
+            PullRequest.repository_id == repository.id,
+            PullRequest.github_pr_number == number,
+        )
+    )
+    if pull_request and delivery_id and pull_request.last_delivery_id == delivery_id:
+        return {"status": "duplicate", "event": action}
+    token = await installation_token(settings, installation_id)
+    changed_files = await pull_request_files(repository.owner, repository.name, number, token)
+    if not pull_request:
+        pull_request = PullRequest(
+            repository_id=repository.id,
+            github_pr_number=number,
+            installation_id=installation_id,
+            title=str(github_pull_request.get("title") or f"Pull request #{number}"),
+            author=str(github_pull_request.get("user", {}).get("login") or "unknown"),
+            html_url=str(github_pull_request["html_url"]),
+            base_sha=base_sha,
+            head_sha=head_sha,
+        )
+        db.add(pull_request)
+        db.flush()
+    analysis = Analysis(repository_id=repository.id, commit_sha=head_sha)
+    db.add(analysis)
+    db.flush()
+    pull_request.analysis_id = analysis.id
+    pull_request.installation_id = installation_id
+    pull_request.title = str(github_pull_request.get("title") or pull_request.title)
+    pull_request.author = str(github_pull_request.get("user", {}).get("login") or "unknown")
+    pull_request.html_url = str(github_pull_request["html_url"])
+    pull_request.base_sha = base_sha
+    pull_request.head_sha = head_sha
+    pull_request.state = str(github_pull_request.get("state") or "open")
+    pull_request.status = analysis.status
+    pull_request.risk_score = None
+    pull_request.risk_level = None
+    pull_request.changed_files = changed_files
+    pull_request.last_delivery_id = delivery_id
+    pull_request.updated_at = utcnow()
+    db.commit()
+    if settings.inline_worker:
+        background.add_task(process_analysis, analysis.id)
+    return {"status": "accepted", "event": action}
+
+
+@app.get("/repositories/{repository_id}/pull-requests", response_model=list[PullRequestOut])
+def repository_pull_requests(repository_id: str, db: Db, user: CurrentUser) -> list[PullRequest]:
+    repository = db.scalar(
+        select(Repository).where(Repository.id == repository_id, Repository.user_id == user.id)
+    )
+    if not repository:
+        raise HTTPException(404, "Repository not found")
+    return list(
+        db.scalars(
+            select(PullRequest)
+            .where(PullRequest.repository_id == repository.id)
+            .order_by(desc(PullRequest.updated_at))
+        )
+    )
 
 
 @app.get("/analyses", response_model=list[AnalysisOut])

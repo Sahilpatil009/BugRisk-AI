@@ -10,8 +10,8 @@ public Next.js variables are embedded in the browser bundle.
 
 The included `render.yaml` explicitly selects Render's `free` plan for one web service, with analysis jobs handled inside the
 API process. Configure
-`DATABASE_URL`, `FRONTEND_URL`, `BACKEND_URL`, GitHub OAuth credentials, `SESSION_SECRET`, and
-`TOKEN_ENCRYPTION_KEY`.
+`DATABASE_URL`, `FRONTEND_URL`, `BACKEND_URL`, GitHub OAuth credentials, GitHub App credentials,
+`SESSION_SECRET`, and `TOKEN_ENCRYPTION_KEY`.
 
 Set `DEMO_MODE=false` and `INLINE_WORKER=true`. Apply the Supabase SQL migration before serving
 traffic. Use a durable object store or image-baked artifact for the trained model; do not depend
@@ -26,7 +26,7 @@ and stronger process isolation.
 ## Supabase
 
 Use the direct PostgreSQL connection for migrations and the pooled connection for runtime where
-appropriate. Apply `backend/supabase/migrations/001_initial_schema.sql`, grant only the required
+appropriate. Apply every SQL file in `backend/supabase/migrations` in numeric order, grant only the required
 table privileges, and verify the RLS policies with two distinct test users before production.
 The API remains the only client allowed to hold the database service credential.
 
@@ -38,3 +38,5 @@ The API remains the only client allowed to hold the database service credential.
 - A second user receives 404 for the first user's repository, analysis, and file identifiers.
 - Frontend dashboard, file evidence, model card, and failed-analysis state render without console
   or network errors.
+- A signed `pull_request.opened` webhook creates an analysis containing only changed Python files,
+  posts a GitHub report, and a later `synchronize` delivery updates the same comment.
