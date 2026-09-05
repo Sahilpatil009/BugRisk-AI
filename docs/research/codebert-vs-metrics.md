@@ -37,10 +37,27 @@ semantics** to the git/code metrics improves defect prediction:
   Both models are trained **only on commits whose source resolved in the
   mirrors**, so the comparison is on identical rows.
 
+## Extraction resolution (first run)
+
+Resolution of dataset commit SHAs against the public mirrors, from
+`resolution.json`:
+
+| Project | Dataset commits | SHAs resolved | Commits with source |
+| --- | ---: | ---: | ---: |
+| apache/zookeeper | 839 | 836 | 832 |
+| apache/spark | 1,465 | 1,457 | 1,453 |
+
+zookeeper resolves 99.6% of SHAs (three pre-fork commits have no mirror
+history) and 832 of 839 commits have reconstructable source — enough to run
+the pipeline end to end. The remaining projects are in the same order of
+magnitude; the expanded 5-project run is the target for the headline table.
+
 ## Results
 
 _Updated after each run — see `ml/artifacts/codebert/codebert_comparison.json`
-for the machine-readable version._
+for the machine-readable version. The full 5-project run is still in
+progress at the time of writing; the table below will be filled from the
+final `codebert_comparison.json`._
 
 | Metric | XGBoost (metrics only) | CodeBERT + metrics (MLP) | Δ |
 | --- | ---: | ---: | ---: |
