@@ -21,3 +21,34 @@ stages:
     outs:
       - ml/artifacts/bugrisk_model.joblib
       - ml/artifacts/metrics.json
+  codebert-extract:
+    cmd: >
+      python -m ml.embeddings.extract
+      --data ml/data/processed/apachejit.csv
+      --cache-root ~/.cache/bugrisk/repos
+      --output ml/data/codebert/sources
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/embeddings/extract.py
+    outs:
+      - ml/data/codebert/sources/sources.parquet
+      - ml/data/codebert/sources/resolution.json
+  codebert-embed:
+    cmd: python -m ml.embeddings.embed --sources ml/data/codebert/sources/sources.parquet --output ml/data/codebert/embeddings
+    deps:
+      - ml/data/codebert/sources/sources.parquet
+      - ml/embeddings/embed.py
+    outs:
+      - ml/data/codebert/embeddings/embeddings.npz
+      - ml/data/codebert/embeddings/embedding_meta.json
+  codebert-train:
+    cmd: python -m ml.training.train_codebert --data ml/data/processed/apachejit.csv --embeddings ml/data/codebert/embeddings/embeddings.npz --output ml/artifacts/codebert
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/data/codebert/embeddings/embeddings.npz
+      - ml/training/train_codebert.py
+      - ml/training/train.py
+      - ml/features/schema.py
+    outs:
+      - ml/artifacts/codebert/codebert_model.joblib
+      - ml/artifacts/codebert/codebert_comparison.json

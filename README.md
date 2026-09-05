@@ -19,7 +19,8 @@ a claim that the file contains a bug.
 - Signed GitHub App webhooks for opened/updated pull requests, changed-file analysis, and reusable PR comments.
 - Docker Compose, Render, Vercel, and GitHub Actions configuration.
 
-CodeBERT, GRU, and GNN models remain post-MVP research extensions.
+The CodeBERT source-embedding extension (phase 6) is implemented as an offline research pipeline;
+GRU and GNN extensions remain future work.
 
 ## Interface preview
 
@@ -91,6 +92,29 @@ event, and grant read access to metadata and contents plus read/write access to 
 Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`. Install the app on a
 connected repository. The `opened` and `synchronize` events create queued analyses restricted to
 the PR's changed Python files. BugRisk AI creates one report comment and updates it on later pushes.
+
+## CodeBERT research extension (phase 6)
+
+To evaluate whether source-code semantics improve defect prediction beyond the git/code metrics:
+
+```powershell
+pip install -e ".\backend[codebert]"
+python -m ml.embeddings.extract --data ml/data/processed/apachejit.csv `
+    --projects apache/zookeeper,apache/spark,apache/hadoop-mapreduce,apache/hadoop-hdfs,apache/kafka `
+    --output ml/data/codebert/sources
+python -m ml.embeddings.embed --sources ml/data/codebert/sources/sources.parquet `
+    --output ml/data/codebert/embeddings
+python -m ml.training.train_codebert --data ml/data/processed/apachejit.csv `
+    --embeddings ml/data/codebert/embeddings/embeddings.npz --output ml/artifacts/codebert
+```
+
+The extract stage clones the public Apache GitHub mirrors (cache in
+`~/.cache/bugrisk/repos`) and records each dataset commit's changed source files; the embed stage
+produces CodeBERT commit vectors cached by content hash; the train stage compares a
+metrics+embedding MLP against metrics-only XGBoost on identical rows with the same split,
+calibration, and threshold protocol. Results and methodology live in
+[docs/research/codebert-vs-metrics.md](docs/research/codebert-vs-metrics.md). The extension is
+offline research tooling and does not change the live `/predict` path.
 
 ## Supabase
 
