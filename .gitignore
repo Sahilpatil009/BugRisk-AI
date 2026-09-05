@@ -18,6 +18,7 @@ __pycache__/
 .venv/
 ml/data/raw/*.csv
 ml/data/processed/*.csv
+ml/data/codebert/
 ml/artifacts/*.joblib
 ml/artifacts/*.json
 mlruns/

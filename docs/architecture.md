@@ -53,3 +53,16 @@ The MVP recommendation engine is deterministic and based only on SHAP evidence a
 A future LLM adapter may rewrite those actions into friendlier prose, but it must accept and
 return a schema that contains no writable score fields. Invalid or unavailable provider output
 falls back to the deterministic actions.
+
+## Phase 6 research extension (CodeBERT)
+
+The deployed model consumes only the 11 git/code metrics. To test whether source-code semantics
+add signal, `ml/embeddings` reconstructs the changed source files for historical ApacheJIT commits
+from the public Apache GitHub mirrors (one bulk `git log --name-only` plus one bulk
+`git cat-file --batch` per mirror) and encodes each changed file with CodeBERT. The commit vector
+is the L2-normalized mean of its changed-file vectors, cached by content hash.
+`ml/training/train_codebert.py` trains an MLP on metrics + embedding and a metrics-only XGBoost on
+the exact same rows, using the identical temporal split, Platt calibration, and F2 threshold
+protocol, then writes `codebert_comparison.json`. This stays out of the live `/predict` path until
+the comparison justifies the extra inference cost. See
+[docs/research/codebert-vs-metrics.md](research/codebert-vs-metrics.md).
