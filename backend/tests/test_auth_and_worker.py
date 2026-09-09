@@ -53,6 +53,29 @@ def test_oauth_redirect_uses_callback_scope_and_session_state():
     assert query["state"] == [request.session["oauth_state"]]
 
 
+def test_github_app_private_key_can_be_loaded_from_secret_file(tmp_path):
+    private_key_file = tmp_path / "github-app.pem"
+    private_key_file.write_text("private-key-content\n", encoding="utf-8")
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_app_private_key_file=private_key_file,
+    )
+
+    assert settings.normalized_github_app_private_key == "private-key-content\n"
+
+
+def test_inline_github_app_private_key_takes_precedence(tmp_path):
+    private_key_file = tmp_path / "github-app.pem"
+    private_key_file.write_text("file-key\n", encoding="utf-8")
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_app_private_key="inline-key\\n",
+        github_app_private_key_file=private_key_file,
+    )
+
+    assert settings.normalized_github_app_private_key == "inline-key\n"
+
+
 def test_llm_rewrite_has_deterministic_fallback(monkeypatch):
     def fail(*_args, **_kwargs):
         raise httpx.ConnectError("offline")
