@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     github_client_secret: str | None = None
     github_app_id: str | None = None
     github_app_private_key: str | None = None
+    github_app_private_key_file: Path | None = None
     github_webhook_secret: str | None = None
     demo_mode: bool = True
     inline_worker: bool = True
@@ -34,9 +35,14 @@ class Settings(BaseSettings):
 
     @property
     def normalized_github_app_private_key(self) -> str | None:
-        if not self.github_app_private_key:
-            return None
-        return self.github_app_private_key.replace("\\n", "\n")
+        if self.github_app_private_key:
+            return self.github_app_private_key.replace("\\n", "\n")
+        if self.github_app_private_key_file:
+            try:
+                return self.github_app_private_key_file.read_text(encoding="utf-8")
+            except OSError:
+                return None
+        return None
 
 
 @lru_cache
