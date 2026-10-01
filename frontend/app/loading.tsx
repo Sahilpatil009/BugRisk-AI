@@ -1,0 +1,1 @@
+export default function Loading() { return <main className="grid min-h-screen place-items-center"><div className="grid place-items-center"><div className="size-10 animate-spin rounded-full border-2 border-ink border-t-pink" aria-label="Loading" /><p className="mt-4 font-mono text-xs font-black">LOADING WORKSPACE</p></div></main>; }

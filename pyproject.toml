@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Run ML tests from the project root.
+# Redirect pytest's tmp_path away from the system temp folder,
+# which can be locked on Windows (WinError 5 / Access denied).
+addopts = "--basetemp=D:/tmp/pytest-ml -p no:cacheprovider"
+tmp_path_retention_policy = "failed"

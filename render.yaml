@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: bugrisk-api
+    runtime: docker
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY_FILE
+        value: /etc/secrets/bugrisk-ai-private-key.pem
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: DEMO_MODE
+        value: false
+      - key: INLINE_WORKER
+        value: true
+      - key: MODEL_PATH
+        value: /models/bugrisk_model.joblib
+      - key: COOKIE_SAME_SITE
+        value: none

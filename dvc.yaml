@@ -1,0 +1,168 @@
+﻿stages:
+  acquire:
+    desc: "Downloads the ApacheJIT dataset (Zenodo 5907847, CC BY 4.0) — the only permitted training data source."
+    cmd: python scripts/fetch_apachejit.py --output ml/data/raw/apachejit.csv
+    deps:
+      - scripts/fetch_apachejit.py
+    outs:
+      - ml/data/raw/apachejit.csv
+  preprocess:
+    desc: "Normalizes ApacheJIT columns to the canonical feature schema."
+    cmd: python -m ml.preprocessing.prepare --input ml/data/raw/apachejit.csv --output ml/data/processed/apachejit.csv
+    deps:
+      - ml/data/raw/apachejit.csv
+      - ml/preprocessing/prepare.py
+    outs:
+      - ml/data/processed/apachejit.csv
+  train:
+    desc: "Trains XGBoost/LR/RF candidates on ApacheJIT; selects best by PR-AUC; Platt-calibrates."
+    cmd: python -m ml.training.train --data ml/data/processed/apachejit.csv --output ml/artifacts
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/training/train.py
+      - ml/features/schema.py
+    outs:
+      - ml/artifacts/bugrisk_model.joblib
+      - ml/artifacts/metrics.json
+  codebert-extract:
+    desc: "Clones Apache GitHub mirrors and extracts post-change source for CodeBERT embedding."
+    cmd: >
+      python -m ml.embeddings.extract
+      --data ml/data/processed/apachejit.csv
+      --cache-root ~/.cache/bugrisk/repos
+      --output ml/data/codebert/sources
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/embeddings/extract.py
+    outs:
+      - ml/data/codebert/sources/sources.parquet
+      - ml/data/codebert/sources/resolution.json
+  codebert-embed:
+    desc: "Encodes extracted sources with CodeBERT; caches by content hash to avoid re-encoding."
+    cmd: python -m ml.embeddings.embed --sources ml/data/codebert/sources/sources.parquet --output ml/data/codebert/embeddings
+    deps:
+      - ml/data/codebert/sources/sources.parquet
+      - ml/embeddings/embed.py
+    outs:
+      - ml/data/codebert/embeddings/embeddings.npz
+      - ml/data/codebert/embeddings/embedding_meta.json
+  codebert-train:
+    desc: "Trains a metrics+CodeBERT MLP; reports comparison against the XGBoost baseline."
+    cmd: python -m ml.training.train_codebert --data ml/data/processed/apachejit.csv --embeddings ml/data/codebert/embeddings/embeddings.npz --output ml/artifacts/codebert
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/data/codebert/embeddings/embeddings.npz
+      - ml/training/train_codebert.py
+      - ml/training/train.py
+      - ml/features/schema.py
+    outs:
+      - ml/artifacts/codebert/codebert_model.joblib
+      - ml/artifacts/codebert/codebert_comparison.json
+  file-dataset:
+    desc: "Joins ApacheJIT commit rows with per-file source content; adds chronological split labels."
+    cmd: >
+      python -m ml.pipeline.file_dataset
+      --processed-csv ml/data/processed/apachejit.csv
+      --sources-parquet ml/data/codebert/sources/sources.parquet
+      --output ml/data/file_level/files.parquet
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/data/codebert/sources/sources.parquet
+      - ml/pipeline/file_dataset.py
+    outs:
+      - ml/data/file_level/files.parquet
+  codebert-embed-files:
+    desc: "Generates per-file CodeBERT embeddings; caches by content hash."
+    cmd: >
+      python -m ml.pipeline.file_embeddings
+      --files-parquet ml/data/file_level/files.parquet
+      --output ml/data/file_level/embeddings
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/pipeline/file_embeddings.py
+      - ml/embeddings/embed.py
+    outs:
+      - ml/data/file_level/embeddings/file_embeddings.npz
+      - ml/data/file_level/embeddings/file_embedding_meta.json
+
+  history-sequences:
+    desc: "Builds padded GRU input sequences from per-file commit history."
+    cmd: >
+      python -m ml.pipeline.history_sequences
+      --files-parquet ml/data/file_level/files.parquet
+      --output-dir ml/data/file_level/history
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/pipeline/history_sequences.py
+      - ml/models/gru_history.py
+    outs:
+      - ml/data/file_level/history/history_sequences.npy
+      - ml/data/file_level/history/history_masks.npy
+      - ml/data/file_level/history/history_keys.npz
+  train-gru:
+    desc: "Trains GRU on file history sequences; early stopping; Platt calibration."
+    cmd: >
+      python -m ml.training.train_gru
+      --files-parquet ml/data/file_level/files.parquet
+      --sequences-dir ml/data/file_level/history
+      --output-dir ml/artifacts/gru
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/data/file_level/history/history_sequences.npy
+      - ml/training/train_gru.py
+      - ml/models/gru_history.py
+    outs:
+      - ml/artifacts/gru/gru_weights.pt
+      - ml/artifacts/gru/gru_config.json
+      - ml/artifacts/gru/gru_head.joblib
+      - ml/artifacts/gru/gru_metrics.json
+  dependency-graphs:
+    desc: "Parses Python AST imports to build per-commit file dependency graphs."
+    cmd: >
+      python -m ml.pipeline.dependency_graphs
+      --files-parquet ml/data/file_level/files.parquet
+      --output-dir ml/data/file_level/graphs
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/pipeline/dependency_graphs.py
+      - ml/features/schema.py
+    outs:
+      - ml/data/file_level/graphs
+  train-gnn:
+    desc: "Trains GraphSAGE on per-commit dependency graphs; outputs 64-d node embeddings."
+    cmd: >
+      python -m ml.training.train_gnn
+      --files-parquet ml/data/file_level/files.parquet
+      --graphs-dir ml/data/file_level/graphs
+      --output-dir ml/artifacts/gnn
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/data/file_level/graphs
+      - ml/training/train_gnn.py
+      - ml/models/gnn_dependency.py
+    outs:
+      - ml/artifacts/gnn/gnn_weights.pt
+      - ml/artifacts/gnn/gnn_config.json
+      - ml/artifacts/gnn/gnn_head.joblib
+      - ml/artifacts/gnn/gnn_metrics.json
+  train-fusion:
+    desc: "Trains Fusion MLP (CodeBERT+GRU+GNN+metrics); early stopping on val PR-AUC; Platt calibration."
+    cmd: >
+      python -m ml.training.train_fusion
+      --files-parquet ml/data/file_level/files.parquet
+      --embeddings-npz ml/data/file_level/embeddings/file_embeddings.npz
+      --sequences-npy ml/data/file_level/history/history_sequences.npy
+      --gru-dir ml/artifacts/gru
+      --gnn-dir ml/artifacts/gnn
+      --output-dir ml/artifacts/fusion
+    deps:
+      - ml/data/file_level/files.parquet
+      - ml/data/file_level/embeddings/file_embeddings.npz
+      - ml/data/file_level/history/history_sequences.npy
+      - ml/artifacts/gru/gru_weights.pt
+      - ml/artifacts/gnn/gnn_weights.pt
+      - ml/training/train_fusion.py
+      - ml/models/fusion_mlp.py
+    outs:
+      - ml/artifacts/fusion/fusion_model_bundle.joblib
+      - ml/artifacts/fusion/fusion_metrics.json

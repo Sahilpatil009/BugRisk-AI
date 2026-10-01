@@ -1,0 +1,140 @@
+from datetime import timedelta
+from urllib.parse import parse_qs, urlparse
+
+import httpx
+from fastapi import HTTPException
+from sqlalchemy import select
+
+from app.auth import begin_oauth, decrypt_token, encrypt_token
+from app.config import Settings
+from app.database import SessionLocal
+from app.models import Analysis, AnalysisStatus, Repository, utcnow
+from app.recommendation_rewriter import rewrite_recommendations
+from app.services import process_analysis, recover_stale_analyses
+
+
+def test_token_encryption_round_trip():
+    settings = Settings(session_secret="a-secure-test-secret-that-is-long-enough")
+    encrypted = encrypt_token("github-token", settings)
+    assert encrypted != "github-token"
+    assert decrypt_token(encrypted, settings) == "github-token"
+
+
+def test_oauth_refuses_missing_configuration():
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_client_id=None,
+        github_client_secret=None,
+    )
+    try:
+        begin_oauth(object(), settings)  # type: ignore[arg-type]
+    except HTTPException as exc:
+        assert exc.status_code == 503
+    else:
+        raise AssertionError("OAuth should require provider credentials")
+
+
+def test_oauth_redirect_uses_callback_scope_and_session_state():
+    class RequestStub:
+        session: dict[str, str] = {}
+
+    request = RequestStub()
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_client_id="configured-client",
+        github_client_secret="configured-secret",
+        backend_url="http://localhost:8000",
+    )
+
+    redirect = begin_oauth(request, settings)  # type: ignore[arg-type]
+    query = parse_qs(urlparse(redirect).query)
+
+    assert query["redirect_uri"] == ["http://localhost:8000/auth/github/callback"]
+    assert query["scope"] == ["read:user user:email repo"]
+    assert query["state"] == [request.session["oauth_state"]]
+
+
+def test_github_app_private_key_can_be_loaded_from_secret_file(tmp_path):
+    private_key_file = tmp_path / "github-app.pem"
+    private_key_file.write_text("private-key-content\n", encoding="utf-8")
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_app_private_key_file=private_key_file,
+    )
+
+    assert settings.normalized_github_app_private_key == "private-key-content\n"
+
+
+def test_inline_github_app_private_key_takes_precedence(tmp_path):
+    private_key_file = tmp_path / "github-app.pem"
+    private_key_file.write_text("file-key\n", encoding="utf-8")
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        github_app_private_key="inline-key\\n",
+        github_app_private_key_file=private_key_file,
+    )
+
+    assert settings.normalized_github_app_private_key == "inline-key\n"
+
+
+def test_llm_rewrite_has_deterministic_fallback(monkeypatch):
+    def fail(*_args, **_kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx, "post", fail)
+    settings = Settings(
+        session_secret="a-secure-test-secret-that-is-long-enough",
+        llm_rewrite_url="https://provider.invalid/rewrite",
+    )
+    actions = ["Add regression coverage."]
+    assert rewrite_recommendations(actions, [], settings) == actions
+
+
+def test_failed_worker_transition_is_persisted(monkeypatch):
+    with SessionLocal() as db:
+        repository = db.scalar(select(Repository).limit(1))
+        assert repository is not None
+        analysis = Analysis(repository_id=repository.id)
+        db.add(analysis)
+        db.commit()
+        analysis_id = analysis.id
+
+    def fail_analysis(*_args, **_kwargs):
+        raise RuntimeError("fixture clone failed")
+
+    monkeypatch.setattr("app.services.analyze_repository", fail_analysis)
+    process_analysis(analysis_id)
+
+    with SessionLocal() as db:
+        failed = db.get(Analysis, analysis_id)
+        assert failed is not None
+        assert failed.status == AnalysisStatus.FAILED
+        assert failed.error_message == "Analysis failed (RuntimeError)."
+        assert failed.attempt_count == 1
+
+
+def test_stale_analyses_are_requeued_or_failed_at_retry_limit():
+    with SessionLocal() as db:
+        repository = db.scalar(select(Repository).limit(1))
+        assert repository is not None
+        retryable = Analysis(
+            repository_id=repository.id,
+            status=AnalysisStatus.ANALYZING,
+            started_at=utcnow() - timedelta(minutes=20),
+            attempt_count=1,
+        )
+        exhausted = Analysis(
+            repository_id=repository.id,
+            status=AnalysisStatus.PREDICTING,
+            started_at=utcnow() - timedelta(minutes=20),
+            attempt_count=3,
+        )
+        db.add_all([retryable, exhausted])
+        db.commit()
+        assert recover_stale_analyses(db, stale_after_seconds=60, max_attempts=3) == 2
+        db.refresh(retryable)
+        db.refresh(exhausted)
+        assert retryable.status == AnalysisStatus.QUEUED
+        assert retryable.started_at is None
+        assert exhausted.status == AnalysisStatus.FAILED
+        assert exhausted.completed_at is not None

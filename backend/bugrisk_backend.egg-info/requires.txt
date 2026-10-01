@@ -1,0 +1,36 @@
+fastapi<1,>=0.115
+uvicorn[standard]<1,>=0.30
+sqlalchemy<3,>=2.0
+psycopg[binary]<4,>=3.2
+pydantic-settings<3,>=2.6
+httpx<1,>=0.27
+itsdangerous<3,>=2.2
+cryptography<46,>=43
+gitpython<4,>=3.1
+pydriller<3,>=2.7
+radon<7,>=6
+joblib==1.5.3
+numpy==2.4.6
+scikit-learn==1.9.0
+shap<1,>=0.46
+
+[:platform_system != "Windows"]
+xgboost-cpu==3.2.0
+
+[:platform_system == "Windows"]
+xgboost==3.2.0
+
+[codebert]
+torch<3,>=2.2
+transformers<5,>=4.40
+
+[dev]
+pytest<9,>=8
+pytest-cov<7,>=5
+ruff<1,>=0.8
+mypy<2,>=1.13
+
+[ml]
+pandas<3,>=2.2
+mlflow<4,>=2.18
+dvc<4,>=3.56
