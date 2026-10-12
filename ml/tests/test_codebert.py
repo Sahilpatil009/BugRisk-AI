@@ -113,6 +113,21 @@ def test_encode_sources_pools_files_and_caches(tmp_path: Path):
     assert replay_encoder.calls == []  # fully served from cache
 
 
+def test_encode_sources_encodes_the_content_behind_each_hash(tmp_path: Path):
+    encoder = _StubEncoder(dim=4)
+    sources = pd.DataFrame(
+        {
+            "project": ["demo"] * 3,
+            "commit_id": ["a1", "a1", "b2"],
+            "file_path": ["A.java", "B.java", "C.java"],
+            "language": ["java"] * 3,
+            "content": ["same\n", "same\n", "unique\n"],
+        }
+    )
+    encode_sources(sources, tmp_path, encoder, tmp_path / "cache.sqlite3")
+    assert sorted(text for batch in encoder.calls for text in batch) == ["same\n", "unique\n"]
+
+
 def test_train_codebert_experiment_writes_comparison(tmp_path: Path):
     pytest.importorskip("torch")
     from ml.training.train_codebert import train_codebert_experiment

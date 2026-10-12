@@ -157,10 +157,13 @@ def encode_sources(
     commit_ids = list(grouped.groups.keys())
     file_hashes: list[str] = []
     file_to_commit: list[str] = []
+    content_by_hash: dict[str, str] = {}
     for commit_id, block in grouped:
         for content in block["content"]:
-            file_hashes.append(_content_hash(cache.model_name, str(content)))
+            content_hash = _content_hash(cache.model_name, str(content))
+            file_hashes.append(content_hash)
             file_to_commit.append(str(commit_id))
+            content_by_hash.setdefault(content_hash, str(content))
 
     unique_hashes = list(dict.fromkeys(file_hashes))
     cached = cache.known(unique_hashes)
@@ -171,7 +174,7 @@ def encode_sources(
             f"({len(unique_hashes) - len(to_encode_index)} already cached) ...",
             flush=True,
         )
-        texts = [str(sources["content"].iloc[index]) for index in to_encode_index]
+        texts = [content_by_hash[unique_hashes[index]] for index in to_encode_index]
         vectors = np.asarray(encoder.encode(texts), dtype=np.float32)
         cache.put([unique_hashes[index] for index in to_encode_index], vectors)
     vectors_by_hash = cache.get(unique_hashes)
