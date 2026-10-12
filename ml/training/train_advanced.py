@@ -228,7 +228,8 @@ def _summarize(runs: list[dict]) -> dict:
 def _log_mlflow(result: dict, output: Path) -> None:
     try:
         import mlflow
-    except ImportError:
+    except ImportError as error:
+        print(f"[train_advanced] MLflow tracking skipped: {error}", flush=True)
         return
     with mlflow.start_run(run_name=ADVANCED_MODEL_VERSION):
         mlflow.log_params(
