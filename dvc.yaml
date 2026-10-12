@@ -52,3 +52,30 @@ stages:
     outs:
       - ml/artifacts/codebert/codebert_model.joblib
       - ml/artifacts/codebert/codebert_comparison.json
+  advanced-prepare:
+    cmd: python -m ml.advanced.prepare --data ml/data/processed/apachejit.csv --sources ml/data/codebert/sources/sources.parquet --output ml/data/advanced
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/data/codebert/sources/sources.parquet
+      - ml/advanced/prepare.py
+      - ml/features/schema.py
+    outs:
+      - ml/data/advanced/temporal_histories.npz
+      - ml/data/advanced/dependency_graphs.npz
+      - ml/data/advanced/advanced_inputs.json
+  advanced-train:
+    cmd: python -m ml.training.train_advanced --data ml/data/processed/apachejit.csv --embeddings ml/data/codebert/embeddings/embeddings.npz --inputs ml/data/advanced --output ml/artifacts/advanced
+    deps:
+      - ml/data/processed/apachejit.csv
+      - ml/data/codebert/embeddings/embeddings.npz
+      - ml/data/advanced/temporal_histories.npz
+      - ml/data/advanced/dependency_graphs.npz
+      - ml/training/train_advanced.py
+      - ml/training/advanced_model.py
+      - ml/training/train_codebert.py
+      - ml/training/train.py
+    outs:
+      - ml/artifacts/advanced/advanced_model.joblib
+    metrics:
+      - ml/artifacts/advanced/ablation.json:
+          cache: false
