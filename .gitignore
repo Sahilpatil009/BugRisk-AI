@@ -19,7 +19,9 @@ __pycache__/
 ml/data/raw/*.csv
 ml/data/processed/*.csv
 ml/data/codebert/
+ml/data/advanced/
 ml/artifacts/*.joblib
+ml/artifacts/advanced/*.joblib
 ml/artifacts/*.json
 mlruns/
 .dvc/cache/

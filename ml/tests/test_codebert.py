@@ -86,6 +86,32 @@ def test_extract_respects_file_cap_and_missing_commits(tmp_path: Path):
     assert len(sources[sources["commit_id"] == second_sha]) == 1
 
 
+def test_commit_cap_samples_evenly_across_history(tmp_path: Path, monkeypatch):
+    from ml.embeddings import extract
+
+    seen: dict[str, list[str]] = {}
+
+    def fake_extract_project(frame, project, cache_root, max_files, max_chars):
+        seen[project] = frame["commit_id"].tolist()
+        result = extract.ExtractionResult(project=project, repo="local", total_commits=len(frame))
+        return pd.DataFrame({"project": [project], "commit_id": ["x"]}), result
+
+    monkeypatch.setattr(extract, "extract_project", fake_extract_project)
+    frame = pd.DataFrame(
+        {
+            "project": "demo",
+            "commit_id": [f"c{index:03d}" for index in range(100)],
+            "event_time": pd.date_range("2020-01-01", periods=100, freq="D", tz="UTC"),
+        }
+    ).sample(frac=1.0, random_state=3)
+    _, report = extract.extract_sources(
+        frame, ["demo"], tmp_path, tmp_path / "out", max_commits_per_project=20
+    )
+    assert report["demo"]["sampled_commits"] == 20
+    assert seen["demo"][0] == "c000" and seen["demo"][-1] == "c099"
+    assert seen["demo"] == sorted(seen["demo"])
+
+
 def test_encode_sources_pools_files_and_caches(tmp_path: Path):
     encoder = _StubEncoder(dim=8)
     sources = pd.DataFrame(
@@ -111,6 +137,21 @@ def test_encode_sources_pools_files_and_caches(tmp_path: Path):
     replay_encoder = _StubEncoder(dim=8)
     encode_sources(sources, tmp_path, replay_encoder, tmp_path / "cache.sqlite3")
     assert replay_encoder.calls == []  # fully served from cache
+
+
+def test_encode_sources_encodes_the_content_behind_each_hash(tmp_path: Path):
+    encoder = _StubEncoder(dim=4)
+    sources = pd.DataFrame(
+        {
+            "project": ["demo"] * 3,
+            "commit_id": ["a1", "a1", "b2"],
+            "file_path": ["A.java", "B.java", "C.java"],
+            "language": ["java"] * 3,
+            "content": ["same\n", "same\n", "unique\n"],
+        }
+    )
+    encode_sources(sources, tmp_path, encoder, tmp_path / "cache.sqlite3")
+    assert sorted(text for batch in encoder.calls for text in batch) == ["same\n", "unique\n"]
 
 
 def test_train_codebert_experiment_writes_comparison(tmp_path: Path):

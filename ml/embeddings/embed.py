@@ -34,12 +34,20 @@ class CodeBERTEncoder:
 
     name: str
 
-    def __init__(self, model_name: str = DEFAULT_MODEL, device: str = "cpu"):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        device: str = "cpu",
+        batch_size: int = 4,
+        max_length: int = 256,
+    ):
         import torch
         from transformers import AutoModel, AutoTokenizer
 
         self.name = model_name
         self.device = device
+        self._batch_size = batch_size
+        self.max_length = max_length
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name).to(device).eval()
@@ -53,7 +61,7 @@ class CodeBERTEncoder:
                     texts[start : start + self._batch_size],
                     padding=True,
                     truncation=True,
-                    max_length=512,
+                    max_length=self.max_length,
                     return_tensors="pt",
                 ).to(self.device)
                 hidden = self.model(**batch).last_hidden_state
@@ -63,8 +71,6 @@ class CodeBERTEncoder:
         encoded = np.vstack(vectors)
         norms = np.linalg.norm(encoded, axis=1, keepdims=True).clip(min=1e-8)
         return encoded / norms
-
-    _batch_size = 32
 
 
 def _content_hash(model_name: str, content: str) -> str:
@@ -157,10 +163,13 @@ def encode_sources(
     commit_ids = list(grouped.groups.keys())
     file_hashes: list[str] = []
     file_to_commit: list[str] = []
+    content_by_hash: dict[str, str] = {}
     for commit_id, block in grouped:
         for content in block["content"]:
-            file_hashes.append(_content_hash(cache.model_name, str(content)))
+            content_hash = _content_hash(cache.model_name, str(content))
+            file_hashes.append(content_hash)
             file_to_commit.append(str(commit_id))
+            content_by_hash.setdefault(content_hash, str(content))
 
     unique_hashes = list(dict.fromkeys(file_hashes))
     cached = cache.known(unique_hashes)
@@ -171,7 +180,7 @@ def encode_sources(
             f"({len(unique_hashes) - len(to_encode_index)} already cached) ...",
             flush=True,
         )
-        texts = [str(sources["content"].iloc[index]) for index in to_encode_index]
+        texts = [content_by_hash[unique_hashes[index]] for index in to_encode_index]
         vectors = np.asarray(encoder.encode(texts), dtype=np.float32)
         cache.put([unique_hashes[index] for index in to_encode_index], vectors)
     vectors_by_hash = cache.get(unique_hashes)
@@ -232,12 +241,19 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
     parser.add_argument("--cache-db", type=Path, default=None)
-    parser.add_argument("--max-length", type=int, default=512)
+    parser.add_argument("--max-length", type=int, default=256)
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     args = parser.parse_args()
 
     sources = pd.read_parquet(args.sources)
     cache_db = args.cache_db or (args.output / "file_cache.sqlite3")
-    encoder = CodeBERTEncoder(args.model)
+    encoder = CodeBERTEncoder(
+        args.model,
+        device=args.device,
+        batch_size=args.batch_size,
+        max_length=args.max_length,
+    )
     encode_sources(sources, args.output, encoder, cache_db, max_length=args.max_length)
 
 
