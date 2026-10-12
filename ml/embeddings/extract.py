@@ -26,6 +26,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 SOURCE_EXTENSIONS = {".java": "java", ".py": "python", ".scala": "scala", ".kt": "kotlin"}
@@ -239,9 +240,14 @@ def extract_sources(
         if max_commits_per_project is not None:
             if max_commits_per_project < 20:
                 raise ValueError("max_commits_per_project must be at least 20")
-            # Deterministic and label-free: use the most recent project commits.
+            # Deterministic and label-free: evenly spaced commits over the whole history.
+            # Taking only the newest commits would over-sample changes whose bugs have
+            # not been discovered yet, so their clean labels are least reliable.
             order = "event_time" if "event_time" in project_frame.columns else "commit_id"
-            project_frame = project_frame.sort_values(order).tail(max_commits_per_project)
+            project_frame = project_frame.sort_values(order, kind="stable")
+            if len(project_frame) > max_commits_per_project:
+                picks = np.linspace(0, len(project_frame) - 1, max_commits_per_project)
+                project_frame = project_frame.iloc[np.unique(picks.round().astype(int))]
         source_frame, result = extract_project(
             project_frame, project, cache_root, max_files=max_files, max_chars=max_chars
         )
