@@ -227,6 +227,7 @@ def extract_sources(
     output_root: Path,
     max_files: int = 8,
     max_chars: int = 20000,
+    max_commits_per_project: int | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     output_root.mkdir(parents=True, exist_ok=True)
     frames: list[pd.DataFrame] = []
@@ -234,8 +235,15 @@ def extract_sources(
     for project in projects:
         if project not in set(frame["project"]):
             raise ValueError(f"Project {project} is not present in the dataset")
+        project_frame = frame[frame["project"] == project]
+        if max_commits_per_project is not None:
+            if max_commits_per_project < 20:
+                raise ValueError("max_commits_per_project must be at least 20")
+            # Deterministic and label-free: use the most recent project commits.
+            order = "event_time" if "event_time" in project_frame.columns else "commit_id"
+            project_frame = project_frame.sort_values(order).tail(max_commits_per_project)
         source_frame, result = extract_project(
-            frame, project, cache_root, max_files=max_files, max_chars=max_chars
+            project_frame, project, cache_root, max_files=max_files, max_chars=max_chars
         )
         frames.append(source_frame)
         report[project] = {
@@ -245,6 +253,7 @@ def extract_sources(
             "commits_with_code": result.commits_with_code,
             "files_extracted": result.files_extracted,
             "files_missing": result.files_missing,
+            "sampled_commits": len(project_frame),
         }
     combined = pd.concat(frames, ignore_index=True)
     combined.to_parquet(output_root / "sources.parquet", index=False)
@@ -264,6 +273,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-files", type=int, default=8)
     parser.add_argument("--max-chars", type=int, default=20000)
+    parser.add_argument("--max-commits-per-project", type=int, default=None)
     args = parser.parse_args()
 
     frame = pd.read_csv(args.data)
@@ -276,6 +286,7 @@ def main() -> None:
         args.output,
         max_files=args.max_files,
         max_chars=args.max_chars,
+        max_commits_per_project=args.max_commits_per_project,
     )
 
 
