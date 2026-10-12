@@ -1,6 +1,6 @@
 # Phase 7 — Metrics + CodeBERT + GRU + GNN Ablation
 
-Status: _pipeline implemented and validated; the five-project GPU run has not been reported yet._
+Status: _quick five-project GPU run reported below as preliminary; the full run is pending._
 
 ## Question
 
@@ -83,6 +83,41 @@ _Filled only from a committed `ml/artifacts/advanced/ablation.json` produced by 
 | + CodeBERT | _ | _ | _ | _ | _ | _ |
 | + GRU | _ | _ | _ | _ | _ | _ |
 | + GNN | _ | _ | _ | _ | _ | _ |
+
+### Preliminary: quick run (≈300 commits per project)
+
+From [ml/artifacts/advanced/ablation_quick.json](../../ml/artifacts/advanced/ablation_quick.json):
+Colab T4 GPU, `QUICK = True` (evenly spaced cap of 300 commits per project, 4 files and 8,000
+characters per commit, 256 CodeBERT tokens), 3 seeds. 1,321 commits from the five projects with
+a 791 / 264 / 266 split. 1,318 commits have at least one prior commit, and 542 dependency graphs
+have at least one import edge. Values are test-split mean ± std across seeds.
+
+| Variant | Precision | Recall | F1 | F2 | ROC-AUC | PR-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| XGBoost (metrics) | 0.376 ± 0.011 | 0.958 ± 0.005 | 0.540 ± 0.011 | 0.731 ± 0.006 | 0.785 ± 0.005 | 0.644 ± 0.006 |
+| MLP (metrics) | 0.458 ± 0.017 | 0.935 ± 0.027 | 0.614 ± 0.009 | 0.773 ± 0.006 | 0.802 ± 0.021 | 0.661 ± 0.044 |
+| + CodeBERT | 0.444 ± 0.021 | 0.950 ± 0.005 | 0.605 ± 0.019 | 0.773 ± 0.012 | 0.794 ± 0.020 | 0.650 ± 0.033 |
+| + GRU | 0.439 ± 0.021 | 0.946 ± 0.011 | 0.600 ± 0.018 | 0.768 ± 0.010 | 0.807 ± 0.003 | 0.685 ± 0.009 |
+| + GNN | 0.414 ± 0.008 | 0.950 ± 0.005 | 0.577 ± 0.007 | 0.755 ± 0.004 | 0.813 ± 0.007 | 0.682 ± 0.012 |
+
+What this sample does and does not show:
+
+- **CodeBERT adds nothing measurable here**: PR-AUC −0.011 versus MLP (metrics), well inside the
+  seed spread (±0.03–0.04).
+- **The GRU history is the only promising step**: PR-AUC +0.035 over metrics + CodeBERT, with the
+  smallest spread of any MLP variant (±0.009). The gain is still within the MLP (metrics) spread
+  of ±0.044, so it is not yet evidence of improvement.
+- **The GNN adds nothing**: PR-AUC −0.003 with a small ROC-AUC gain (+0.006). Only 41% of commits
+  have any import edge between their changed files, so most graphs carry little structure.
+- **All MLP variants beat XGBoost on ranking** (PR-AUC +0.017 to +0.041, ROC-AUC +0.009 to +0.028)
+  on this small sample. XGBoost's 300-tree setup was tuned on the full dataset and may overfit
+  791 training commits.
+- **The operating points over-flag.** The test split is 33% buggy (87 of 266), while the earlier
+  training and validation commits are far more often buggy (57% overall). Labels of later commits
+  are less mature, so thresholds calibrated on validation land low (0.12–0.42). The result is
+  recall ≈ 0.95 at precision ≈ 0.4 for every variant. Compare variants by PR-AUC and ROC-AUC,
+  which do not depend on the threshold.
+- With 266 test commits, none of these differences is conclusive. The full run decides.
 
 ### Pipeline validation (not a result)
 
