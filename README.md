@@ -19,8 +19,8 @@ a claim that the file contains a bug.
 - Signed GitHub App webhooks for opened/updated pull requests, changed-file analysis, and reusable PR comments.
 - Docker Compose, Render, Vercel, and GitHub Actions configuration.
 
-The CodeBERT source-embedding extension (phase 6) is implemented as an offline research pipeline;
-GRU and GNN extensions remain future work.
+The CodeBERT source-embedding extension (phase 6) and the GRU + GNN + CodeBERT fusion ablation
+(phase 7) are implemented as offline research pipelines; neither changes live inference.
 
 ## Interface preview
 
@@ -115,6 +115,35 @@ metrics+embedding MLP against metrics-only XGBoost on identical rows with the sa
 calibration, and threshold protocol. Results and methodology live in
 [docs/research/codebert-vs-metrics.md](docs/research/codebert-vs-metrics.md). The extension is
 offline research tooling and does not change the live `/predict` path.
+
+The embed stage defaults to CPU-friendly settings (`--batch-size 4 --max-length 256`). On a laptop,
+add `--max-commits-per-project 300 --max-files 4 --max-chars 8000` to the extract stage for a
+deterministic, label-free sample of each project's most recent commits.
+
+## Advanced fusion model (phase 7)
+
+The phase 7 ablation adds two representations on top of the metrics and CodeBERT vectors: a GRU
+over the metrics of each commit's five previous commits in the same project, and a GraphSAGE
+encoder over the import graph of the files the commit changed. A final MLP with a sigmoid returns
+the 0-1 commit/change risk probability. Five variants are trained on identical commits with the
+baseline's split, calibration, and threshold protocol: XGBoost (metrics), MLP (metrics),
++ CodeBERT, + GRU, and + GNN.
+
+The full run needs a GPU. Open
+[ml/notebooks/phase7_colab.ipynb](ml/notebooks/phase7_colab.ipynb) in Google Colab with a T4 GPU
+and run all cells; it caches every slow step on Google Drive and writes `ablation.json`. Locally,
+after the phase 6 extract and embed stages:
+
+```powershell
+python -m ml.advanced.prepare --data ml/data/processed/apachejit.csv `
+    --sources ml/data/codebert/sources/sources.parquet --output ml/data/advanced
+python -m ml.training.train_advanced --data ml/data/processed/apachejit.csv `
+    --embeddings ml/data/codebert/embeddings/embeddings.npz --inputs ml/data/advanced `
+    --output ml/artifacts/advanced
+```
+
+(or `dvc repro advanced-train`). Methodology and results live in
+[docs/research/advanced-ablation.md](docs/research/advanced-ablation.md).
 
 ## Supabase
 
